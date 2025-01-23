@@ -1,26 +1,24 @@
-from flask import Flask, render_template, redirect, url_for, request, session, g, flash
+from flask import Flask, render_template, redirect, url_for, request, session, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, SelectField
 from wtforms.validators import DataRequired, Email, Length
-from flask_bcrypt import Bcrypt  # For password hashing
-import json
-from datetime import datetime
-import re
 import pickle
 import numpy as np
+import re
+from admin.routes import routes
 
 app = Flask(__name__)
 app.secret_key = 'heart_disease_prediction_secret_key_123'
 
+# Database Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['WTF_CSRF_ENABLED'] = True
 
 db = SQLAlchemy(app)
-bcrypt = Bcrypt(app)  # Initialize Bcrypt
 
-# Form class
+# Form Classes
 class RegistrationForm(FlaskForm):
     firstname = StringField('First Name', validators=[DataRequired()])
     lastname = StringField('Last Name', validators=[DataRequired()])
@@ -36,7 +34,7 @@ class RegistrationForm(FlaskForm):
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Register')
 
-# Models
+# Database Models
 class Admin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     Username = db.Column(db.String(120), unique=False, nullable=False)
@@ -48,7 +46,7 @@ class Doclogs(db.Model):
     Lastname = db.Column(db.String(120), unique=False, nullable=False)
     Ph = db.Column(db.Integer, unique=False, nullable=False)
     Profession = db.Column(db.String(120), unique=False, nullable=False)
-    Email = db.Column(db.String(20), unique=False, nullable=False)
+    Email = db.Column(db.String(120), unique=False, nullable=False)
     Username = db.Column(db.String(120), unique=False, nullable=False)
     Password = db.Column(db.String(120), unique=False, nullable=False)
 
@@ -56,15 +54,11 @@ class Hdpuser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     FirstName = db.Column(db.String(120), unique=False, nullable=False)
     LastName = db.Column(db.String(120), unique=False, nullable=False)
-    Email = db.Column(db.String(20), unique=False, nullable=False)
+    Email = db.Column(db.String(120), unique=False, nullable=False)
     Ph_no = db.Column(db.Integer, unique=False, nullable=False)
-    Profession = db.Column(db.String(12), unique=False, nullable=False)
+    Profession = db.Column(db.String(120), unique=False, nullable=False)
     Username = db.Column(db.String(120), unique=False, nullable=False)
     Password = db.Column(db.String(120), unique=False, nullable=False)
-
-class Emails(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    Email = db.Column(db.String(120), unique=False, nullable=False)
 
 class Dataset(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -77,26 +71,22 @@ class Dataset(db.Model):
     Restecg = db.Column(db.Integer, unique=False, nullable=False)
     Thalach = db.Column(db.Integer, unique=False, nullable=False)
     Exang = db.Column(db.Integer, unique=False, nullable=False)
-    Oldpeak = db.Column(db.Integer, unique=False, nullable=False)
+    Oldpeak = db.Column(db.Float, unique=False, nullable=False)
     Slope = db.Column(db.Integer, unique=False, nullable=False)
     Ca = db.Column(db.Integer, unique=False, nullable=False)
     Thal = db.Column(db.Integer, unique=False, nullable=False)
     Target = db.Column(db.Integer, unique=False, nullable=False)
 
-# Load logged-in user into g.user
-@app.before_request
-def load_logged_in_user():
-    g.user = None
-    if 'user' in session:
-        g.user = session['user']
+# Register Blueprint
+app.register_blueprint(routes, url_prefix='')
 
-# Create all tables and add admin if not exists
+# Create Database Tables
 with app.app_context():
     db.create_all()
+    # Add default admin if not exists
     existing_admin = Admin.query.filter_by(Username="admin").first()
     if not existing_admin:
-        hashed_password = bcrypt.generate_password_hash("admin123").decode('utf-8')
-        admin = Admin(Username="admin", Password=hashed_password)
+        admin = Admin(Username="admin", Password="admin123")
         db.session.add(admin)
         db.session.commit()
 
@@ -105,10 +95,10 @@ with app.app_context():
 def doclogin():
     msg = ""
     if request.method == 'POST':
-        uname = request.form['username']
-        passd = request.form['password']
+        uname = request.form.get('username')
+        passd = request.form.get('password')
         user1 = Doclogs.query.filter_by(Username=uname).first()
-        if user1 and bcrypt.check_password_hash(user1.Password, passd):
+        if user1 and passd == user1.Password:
             session['user'] = uname
             return render_template('docindex.html', user1=user1)
         else:
@@ -127,14 +117,28 @@ def dash():
     c22 = count2 // 2
     return render_template('dash.html', d=d, count=count, count1=count1, count2=count2, c22=c22)
 
+@app.route('/admlogin', methods=['GET', 'POST'])
+def adminlogin():
+    msg = ''
+    if request.method == 'POST':
+        uname = request.form.get('username', '')
+        passd = request.form.get('password', '')
+        admin = Admin.query.filter_by(Username=uname).first()
+        if admin and passd == admin.Password:
+            session['admin'] = uname
+            return redirect(url_for('dash'))
+        else:
+            msg = 'Invalid Credentials'
+    return render_template('admlogin.html', msg=msg)
+
 @app.route('/patientlogin', methods=['GET', 'POST'])
 def patlog():
     msg = ""
     if request.method == 'POST':
-        uname = request.form['username']
-        passd = request.form['password']
+        uname = request.form.get('username')
+        passd = request.form.get('password')
         user1 = Hdpuser.query.filter_by(Username=uname).first()
-        if user1 and bcrypt.check_password_hash(user1.Password, passd):
+        if user1 and passd == user1.Password:
             session['user'] = uname
             return render_template('profilepatient.html', user1=user1)
         else:
@@ -144,8 +148,7 @@ def patlog():
 @app.route('/docregis', methods=['GET', 'POST'])
 def docregis():
     form = RegistrationForm()
-    if request.method == 'POST' and form.validate():
-        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+    if request.method == 'POST' and form.validate_on_submit():
         entry = Doclogs(
             Firstname=form.firstname.data,
             Lastname=form.lastname.data,
@@ -153,7 +156,7 @@ def docregis():
             Ph=form.phone.data,
             Profession=form.Pro.data,
             Username=form.username.data,
-            Password=hashed_password
+            Password=form.password.data
         )
         db.session.add(entry)
         db.session.commit()
@@ -189,12 +192,11 @@ def predict():
         prediction = model.predict(final_features)
         output = round(prediction[0], 2)
         if output == 1:
-            o = "Bad News! There is a chance that you have a heart disease."
-            return render_template('heartcheck.html', prediction_text='Heart status: {}'.format(o))
+            o = "Bad News! There is a chance that you have heart disease."
         else:
-            o = "Good News! There is no chance that you have a heart disease! :)"
-            return render_template('heartcheck.html', prediction_text2='Heart status: {}'.format(o))
-    return redirect('/predict')
+            o = "Good News! There is no chance that you have heart disease!"
+        return render_template('heartcheck.html', prediction_text=o)
+    return redirect('/heartcheck')
 
 @app.route('/docpredict', methods=['POST'])
 def docpredict():
@@ -205,56 +207,132 @@ def docpredict():
         prediction = model.predict(final_features)
         output = round(prediction[0], 2)
         if output == 1:
-            o = "Bad News! There is a chance that you have a heart disease."
-            return render_template('heartcheck.html', prediction_text='Heart status: {}'.format(o))
+            o = "Bad News! There is a chance that you have heart disease."
         else:
-            o = "Good News! There is no chance that you have a heart disease! :)"
-            return render_template('heartcheck.html', prediction_text2='Heart status: {}'.format(o))
+            o = "Good News! There is no chance that you have heart disease!"
+        return render_template('heartcheck.html', prediction_text=o)
     return redirect('/docpredict')
+
+@app.route('/adminup', methods=['GET', 'POST'])
+def adminup():
+    if request.method == 'POST':
+        c = Hdpuser.query.get(request.form.get('id'))
+        if c:
+            c.FirstName = request.form.get('name')
+            c.LastName = request.form.get('name2')
+            c.Email = request.form.get('email')
+            c.Ph_no = request.form.get('phone')
+            c.Username = request.form.get('usern')
+            c.Password = request.form.get('pass')
+            db.session.commit()
+            flash("Patient detail Updated Successfully")
+        else:
+            flash("Patient not found")
+        return redirect(url_for('adminview'))
+
+@app.route('/admindocup', methods=['GET', 'POST'])
+def admindocup():
+    if request.method == 'POST':
+        c = Doclogs.query.get(request.form.get('id'))
+        if c:
+            c.Firstname = request.form.get('name')
+            c.Lastname = request.form.get('name2')
+            c.Ph = request.form.get('phone')
+            c.Username = request.form.get('usern')
+            c.Password = request.form.get('pass')
+            db.session.commit()
+            flash("Doctor Details Updated Successfully")
+        else:
+            flash("Doctor not found")
+        return redirect(url_for('adminvdoc'))
+
+@app.route('/admindel/<id>/', methods=['GET', 'POST'])
+def admindel(id):
+    c = Hdpuser.query.get(id)
+    if c:
+        db.session.delete(c)
+        db.session.commit()
+        flash("Patient Deleted Successfully")
+    else:
+        flash("Patient not found")
+    return redirect(url_for('adminview'))
+
+@app.route('/admindeldoc/<id>/', methods=['GET', 'POST'])
+def admindeldoc(id):
+    c = Doclogs.query.get(id)
+    if c:
+        db.session.delete(c)
+        db.session.commit()
+        flash("Doctor Deleted Successfully")
+    else:
+        flash("Doctor not found")
+    return redirect(url_for('adminvdoc'))
 
 @app.route('/viewdatatable')
 def viewdatatable():
     ds = Dataset.query.all()
-    c = Doclogs.query.filter_by(Username=g.user).first()
+    c = Doclogs.query.filter_by(Username=session.get('user')).first()
     return render_template('datatable.html', ds=ds, c=c)
 
 @app.route('/docindex')
 def docindex():
-    curr = Doclogs.query.filter_by(Username=g.user).first()
-    return render_template('docindex.html', curr=curr)
+    curr = Doclogs.query.filter_by(Username=session.get('user')).first()
+    return render_template('docindex.html', user1=curr)
 
 @app.route('/viewpatient')
 def viewpatient():
     patient = Hdpuser.query.all()
-    c = Doclogs.query.filter_by(Username=g.user).first()
+    c = Doclogs.query.filter_by(Username=session.get('user')).first()
     return render_template('viewpatient.html', patient=patient, c=c)
 
 @app.route('/userprofile')
 def userprofile():
-    c = Doclogs.query.filter_by(Username=g.user).first()
+    c = Doclogs.query.filter_by(Username=session.get('user')).first()
     return render_template('userprofile.html', c=c)
 
 @app.route('/docupdate', methods=['GET', 'POST'])
 def docupdate():
     if request.method == 'POST':
-        d = Doclogs.query.filter_by(Username=g.user).first()
-        d.Firstname = request.form['name1']
-        d.Lastname = request.form['name2']
-        d.Email = request.form['email']
-        d.Ph = request.form['phone']
-        d.Profession = request.form['pro']
-        db.session.commit()
-        flash("Doctor Details Updated Successfully")
-        return redirect("userprofile")
+        d = Doclogs.query.filter_by(Username=session.get('user')).first()
+        if d:
+            d.Firstname = request.form.get('name1')
+            d.Lastname = request.form.get('name2')
+            d.Email = request.form.get('email')
+            d.Ph = request.form.get('phone')
+            d.Profession = request.form.get('pro')
+            db.session.commit()
+            flash("Doctor Details Updated Successfully")
+        else:
+            flash("Doctor not found")
+        return redirect(url_for('userprofile'))
 
 @app.route('/profilepat')
 def profilepat():
-    c = Hdpuser.query.filter_by(Username=g.user).first()
+    c = Hdpuser.query.filter_by(Username=session.get('user')).first()
     return render_template('profilepatient.html', c=c)
 
 @app.route('/checkheart', methods=['GET', 'POST'])
 def checkheart():
     return render_template('checkheart.html')
+
+@app.route('/payment', methods=['GET', 'POST'])
+def payhome():
+    return render_template('paymenthome.html')
+
+@app.route('/success')
+def success():
+    return render_template('paysucces.html')
+
+@app.route('/pay', methods=['POST', 'GET'])
+def pay():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        purpose = request.form.get('purpose')
+        email = request.form.get('email')
+        amount = request.form.get('amount')
+        # Add payment logic here (e.g., using an API)
+        return redirect(url_for('success'))
+    return redirect('/')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -273,7 +351,6 @@ def register():
         elif not re.match(r'[789]\d{9}$', form.phone.data):
             flash('Invalid phone number!')
         else:
-            hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
             entry = Hdpuser(
                 FirstName=form.firstname.data,
                 LastName=form.lastname.data,
@@ -281,7 +358,7 @@ def register():
                 Ph_no=form.phone.data,
                 Profession=form.Pro.data,
                 Username=form.username.data,
-                Password=hashed_password
+                Password=form.password.data
             )
             db.session.add(entry)
             db.session.commit()
@@ -291,5 +368,3 @@ def register():
 
 if __name__ == "__main__":
     app.run(debug=True)
-    
-    
