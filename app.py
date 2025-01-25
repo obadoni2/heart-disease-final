@@ -6,6 +6,7 @@ from wtforms.validators import DataRequired, Email, Length
 import pickle
 import numpy as np
 import re
+import os
 from admin.routes import routes
 
 app = Flask(__name__)
@@ -59,6 +60,10 @@ class Hdpuser(db.Model):
     Profession = db.Column(db.String(120), unique=False, nullable=False)
     Username = db.Column(db.String(120), unique=False, nullable=False)
     Password = db.Column(db.String(120), unique=False, nullable=False)
+
+class Emails(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    Email = db.Column(db.String(120), unique=False, nullable=False)
 
 class Dataset(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -186,7 +191,10 @@ def heartcheck():
 @app.route('/predict', methods=['POST'])
 def predict():
     if request.method == 'POST':
-        model = pickle.load(open(r'D:\keval\study\Projects\hdp\Heart_Disease_Prediction-FLask-\modal2.pkl', 'rb'))
+        model_path = 'modal2.pkl'  # Ensure the file is in the same directory as app.py
+        if not os.path.exists(model_path):
+            return "Model file not found. Please ensure 'modal2.pkl' exists in the project directory.", 500
+        model = pickle.load(open(model_path, 'rb'))
         int_features = [int(x) for x in request.form.values()]
         final_features = [np.array(int_features)]
         prediction = model.predict(final_features)
@@ -201,7 +209,10 @@ def predict():
 @app.route('/docpredict', methods=['POST'])
 def docpredict():
     if request.method == 'POST':
-        model = pickle.load(open(r'D:\keval\study\Projects\hdp\Heart_Disease_Prediction-FLask-\modal2.pkl', 'rb'))
+        model_path = 'modal2.pkl'  # Ensure the file is in the same directory as app.py
+        if not os.path.exists(model_path):
+            return "Model file not found. Please ensure 'modal2.pkl' exists in the project directory.", 500
+        model = pickle.load(open(model_path, 'rb'))
         int_features = [int(x) for x in request.form.values()]
         final_features = [np.array(int_features)]
         prediction = model.predict(final_features)
@@ -368,3 +379,5 @@ def register():
 
 if __name__ == "__main__":
     app.run(debug=True)
+     
+    
