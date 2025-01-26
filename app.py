@@ -194,16 +194,31 @@ def predict():
         model_path = 'modal2.pkl'  # Ensure the file is in the same directory as app.py
         if not os.path.exists(model_path):
             return "Model file not found. Please ensure 'modal2.pkl' exists in the project directory.", 500
+        
+        # Load the model
         model = pickle.load(open(model_path, 'rb'))
-        int_features = [int(x) for x in request.form.values()]
-        final_features = [np.array(int_features)]
-        prediction = model.predict(final_features)
-        output = round(prediction[0], 2)
-        if output == 1:
-            o = "Bad News! There is a chance that you have heart disease."
-        else:
-            o = "Good News! There is no chance that you have heart disease!"
-        return render_template('heartcheck.html', prediction_text=o)
+        
+        try:
+            # Convert input values to floats (or integers if applicable)
+            features = [float(x) for x in request.form.values()]
+            final_features = [np.array(features)]
+            
+            # Make prediction
+            prediction = model.predict(final_features)
+            output = round(prediction[0], 2)
+            
+            # Determine the prediction message
+            if output == 1:
+                o = "Bad News! There is a chance that you have heart disease."
+            else:
+                o = "Good News! There is no chance that you have heart disease!"
+            
+            return render_template('heartcheck.html', prediction_text=o)
+        
+        except ValueError as e:
+            # Handle invalid input (e.g., non-numeric values)
+            return f"Invalid input: {e}. Please ensure all inputs are numeric.", 400
+    
     return redirect('/heartcheck')
 
 @app.route('/docpredict', methods=['POST'])
@@ -212,16 +227,31 @@ def docpredict():
         model_path = 'modal2.pkl'  # Ensure the file is in the same directory as app.py
         if not os.path.exists(model_path):
             return "Model file not found. Please ensure 'modal2.pkl' exists in the project directory.", 500
+        
+        # Load the model
         model = pickle.load(open(model_path, 'rb'))
-        int_features = [int(x) for x in request.form.values()]
-        final_features = [np.array(int_features)]
-        prediction = model.predict(final_features)
-        output = round(prediction[0], 2)
-        if output == 1:
-            o = "Bad News! There is a chance that you have heart disease."
-        else:
-            o = "Good News! There is no chance that you have heart disease!"
-        return render_template('heartcheck.html', prediction_text=o)
+        
+        try:
+            # Convert input values to floats (or integers if applicable)
+            features = [float(x) for x in request.form.values()]
+            final_features = [np.array(features)]
+            
+            # Make prediction
+            prediction = model.predict(final_features)
+            output = round(prediction[0], 2)
+            
+            # Determine the prediction message
+            if output == 1:
+                o = "Bad News! There is a chance that you have heart disease."
+            else:
+                o = "Good News! There is no chance that you have heart disease!"
+            
+            return render_template('heartcheck.html', prediction_text=o)
+        
+        except ValueError as e:
+            # Handle invalid input (e.g., non-numeric values)
+            return f"Invalid input: {e}. Please ensure all inputs are numeric.", 400
+    
     return redirect('/docpredict')
 
 @app.route('/adminup', methods=['GET', 'POST'])
@@ -379,5 +409,3 @@ def register():
 
 if __name__ == "__main__":
     app.run(debug=True)
-     
-    
